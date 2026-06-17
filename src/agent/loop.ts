@@ -131,6 +131,31 @@ export class AgentLoop {
     return parts.join("\n");
   }
 
+  private async buildExternalContext(
+    externalContexts: Array<{ path: string; title: string }>
+  ): Promise<string> {
+    if (externalContexts.length === 0) {
+      return "";
+    }
+
+    const parts: string[] = ["[External context: include the following files as additional context for the user request.]"];
+
+    for (const ctx of externalContexts) {
+      const file = this.app.vault.getAbstractFileByPath(ctx.path) as TFile | null;
+      if (file && file instanceof TFile) {
+        try {
+          const content = await this.app.vault.cachedRead(file);
+          parts.push(`File: ${file.path}`);
+          parts.push("```\n" + content.slice(0, 2000) + "\n```");
+        } catch {
+          // ignore read errors
+        }
+      }
+    }
+
+    return parts.join("\n");
+  }
+
   private async buildMentionContext(userMessage: string): Promise<string> {
     const tokens = this.extractMentionTokens(userMessage);
     if (tokens.length === 0) {
@@ -239,7 +264,8 @@ export class AgentLoop {
   async run(
     userMessage: string,
     callbacks: AgentCallbacks,
-    selection?: SelectionScope | null
+    selection?: SelectionScope | null,
+    externalContexts?: Array<{ path: string; title: string }>
   ): Promise<void> {
     this.aborted = false;
 
@@ -250,22 +276,23 @@ export class AgentLoop {
     // If there's a selection, inject it as scoped context
     let fullMessage: string;
     const mentionContext = await this.buildMentionContext(userMessage);
+    const externalContext = await this.buildExternalContext(externalContexts || []);
 
     if (selection) {
       fullMessage = [
         contextPrefix,
         "",
         mentionContext,
-        "",
+        externalContext,
         `[Selection scope: The user has selected text in ${selection.filePath}. Work only within this selection. When using edit_document, use find_replace with text from within this selection. Do not modify text outside the selection.]`,
         "",
         `Selected text:`,
         `> ${selection.text}`,
         "",
         userMessage,
-      ].join("\n");
+      ].filter(line => line.length > 0).join("\n");
     } else {
-      fullMessage = [contextPrefix, "", mentionContext, "", userMessage].join("\n");
+      fullMessage = [contextPrefix, "", mentionContext, externalContext, "", userMessage].filter(line => line.length > 0).join("\n");
     }
 
     this.messages.push({ role: "user", content: fullMessage });
