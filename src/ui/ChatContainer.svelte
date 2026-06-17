@@ -529,76 +529,77 @@
     </div>
   {/if}
 
-  <!-- Input bar -->
-  <div class="ochat-input-bar">
-    <textarea
-      class="ochat-input"
-      bind:this={textareaEl}
-      bind:value={inputText}
-      {placeholder}
-      disabled={!inputEnabled}
-      rows="1"
-      onkeydown={handleKeydown}
-      oninput={() => {
-        autoGrow();
-        updateNoteSuggestions();
-      }}
-      onfocus={updateNoteSuggestions}
-      onblur={() => {
-        setTimeout(() => {
-          showNoteSuggestions = false;
-        }, 150);
-      }}
-    ></textarea>
-    {#if showNoteSuggestions}
-      <div class="ochat-note-suggestions" role="listbox">
-        {#each noteSuggestions as suggestion, index}
-          <div
-            class="ochat-note-suggestion {index === highlightedSuggestion ? 'active' : ''}"
-            role="option"
-            aria-selected={index === highlightedSuggestion}
-            tabindex="-1"
-            onmousedown={(event) => {
-              event.preventDefault();
-              selectNoteSuggestion(index);
-            }}
-          >
-            <div class="ochat-note-title">{suggestion.title}</div>
-            <div class="ochat-note-path">{suggestion.path}</div>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </div>
+  <div class="ochat-input-panel">
+    <div class="ochat-input-bar">
+      <textarea
+        class="ochat-input"
+        bind:this={textareaEl}
+        bind:value={inputText}
+        {placeholder}
+        disabled={!inputEnabled}
+        rows="1"
+        onkeydown={handleKeydown}
+        oninput={() => {
+          autoGrow();
+          updateNoteSuggestions();
+        }}
+        onfocus={updateNoteSuggestions}
+        onblur={() => {
+          setTimeout(() => {
+            showNoteSuggestions = false;
+          }, 150);
+        }}
+      ></textarea>
+      {#if showNoteSuggestions}
+        <div class="ochat-note-suggestions" role="listbox">
+          {#each noteSuggestions as suggestion, index}
+            <div
+              class="ochat-note-suggestion {index === highlightedSuggestion ? 'active' : ''}"
+              role="option"
+              aria-selected={index === highlightedSuggestion}
+              tabindex="-1"
+              onmousedown={(event) => {
+                event.preventDefault();
+                selectNoteSuggestion(index);
+              }}
+            >
+              <div class="ochat-note-title">{suggestion.title}</div>
+              <div class="ochat-note-path">{suggestion.path}</div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
 
-  <div class="ochat-bottom-actions">
-    <div class="ochat-footer-spacer"></div>
-    {#if !isMobileDevice() && inputEnabled}
+    <div class="ochat-bottom-actions">
+      <div class="ochat-footer-spacer"></div>
+      {#if !isMobileDevice() && inputEnabled}
+        <button
+          class="ochat-add-file-btn"
+          onclick={handleAddFile}
+          aria-label="Add external context"
+          title="Add external context"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg>
+        </button>
+        <input
+          type="file"
+          bind:this={fileInputEl}
+          style="display: none;"
+          multiple
+          onchange={handleFileInput}
+        />
+      {/if}
       <button
-        class="ochat-add-file-btn"
-        onclick={handleAddFile}
-        aria-label="Add external context"
-        title="Add external context"
+        class="ochat-send-btn"
+        onclick={handleSend}
+        aria-label="Send message"
+        disabled={!inputEnabled}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+        <span class="ochat-send-label">chat</span>
       </button>
-      <input
-        type="file"
-        bind:this={fileInputEl}
-        style="display: none;"
-        multiple
-        onchange={handleFileInput}
-      />
-    {/if}
-    <button
-      class="ochat-send-btn"
-      onclick={handleSend}
-      aria-label="Send message"
-      disabled={!inputEnabled}
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-      <span class="ochat-send-label">chat</span>
-    </button>
+    </div>
   </div>
 </div>
 
@@ -671,6 +672,7 @@
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
     z-index: 1000;
     margin-bottom: 8px;
+    padding: 6px 0;
   }
 
   .ochat-note-suggestion {
@@ -879,15 +881,24 @@
   }
 
   /* ─── Input Bar ─────────────────────────────────────────────────────── */
+  .ochat-input-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--background-modifier-border);
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    border-radius: var(--radius-m);
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+
   .ochat-input-bar {
     display: flex;
     align-items: flex-end;
     gap: 8px;
-    padding: 8px 12px;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--background-modifier-border);
-    background: transparent;
-    flex-shrink: 0;
     position: relative;
   }
 
@@ -896,9 +907,8 @@
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    padding: 8px 12px;
-    border-top: 1px solid var(--background-modifier-border);
-    background: var(--background-secondary);
+    padding-top: 4px;
+    background: transparent;
     flex-shrink: 0;
   }
 
