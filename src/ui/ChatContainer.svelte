@@ -309,27 +309,27 @@
     const isFileSearch = query.startsWith("file:");
 
     const fileMatches = fileItems.filter((item) =>
-      !isFolderSearch && !isTagSearch && (isFileSearch || normalized.length === 0)
+      (!isFolderSearch && !isTagSearch && !isFileSearch) || isFileSearch
         ? item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)
         : false
     );
 
     const folderMatches = folderItems.filter((item) =>
-      !isTagSearch && (isFolderSearch || normalized.length === 0)
+      (!isFolderSearch && !isTagSearch && !isFileSearch) || isFolderSearch
         ? item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)
         : false
     );
 
     const tagMatches = tagItems.filter((item) =>
-      (isTagSearch || normalized.length === 0)
+      (!isFolderSearch && !isTagSearch && !isFileSearch) || isTagSearch
         ? item.title.toLowerCase().includes(normalized)
         : false
     );
 
     if (!isTagSearch && !isFolderSearch && !isFileSearch) {
-      suggestions.push(...fileItems.slice(0, 8));
-      suggestions.push(...folderItems.slice(0, 5));
-      suggestions.push(...tagItems.slice(0, 5));
+      suggestions.push(...fileItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)).slice(0, 8));
+      suggestions.push(...folderItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)).slice(0, 5));
+      suggestions.push(...tagItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized)).slice(0, 5));
     } else {
       suggestions.push(...fileMatches.slice(0, 8));
       suggestions.push(...folderMatches.slice(0, 5));
@@ -474,10 +474,13 @@
       }}
     ></textarea>
     {#if showNoteSuggestions}
-      <div class="ochat-note-suggestions">
+      <div class="ochat-note-suggestions" role="listbox">
         {#each noteSuggestions as suggestion, index}
           <div
             class="ochat-note-suggestion {index === highlightedSuggestion ? 'active' : ''}"
+            role="option"
+            aria-selected={index === highlightedSuggestion}
+            tabindex="-1"
             onmousedown={(event) => {
               event.preventDefault();
               selectNoteSuggestion(index);
@@ -569,14 +572,15 @@
     position: absolute;
     left: 12px;
     right: 12px;
-    bottom: 58px;
+    bottom: 100%;
     max-height: 220px;
     overflow-y: auto;
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
     box-shadow: var(--shadow-elevation-3);
-    z-index: 10;
+    z-index: 1000;
+    margin-bottom: 4px;
   }
 
   .ochat-note-suggestion {
@@ -785,6 +789,7 @@
     border-top: 1px solid var(--background-modifier-border);
     background: transparent;
     flex-shrink: 0;
+    position: relative;
   }
 
   .ochat-input {
