@@ -1061,15 +1061,6 @@
     cursor: not-allowed;
   }
 
-  .ochat-stop-btn {
-    background-color: var(--text-error);
-  }
-
-  .ochat-stop-btn:hover {
-    background-color: var(--text-error);
-    opacity: 0.85;
-  }
-
   /* ─── Selection Pill ─────────────────────────────────────────────────── */
   .ochat-selection-pill {
     display: flex;
