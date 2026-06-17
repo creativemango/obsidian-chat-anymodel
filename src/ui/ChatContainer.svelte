@@ -639,7 +639,7 @@
 
   /* ─── Messages ──────────────────────────────────────────────────────── */
   .ochat-messages {
-    flex: 1 1 0;
+    flex: 3 1 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 12px;
