@@ -573,7 +573,7 @@
     left: 0;
     right: 0;
     bottom: 100%;
-    max-height: 500px;
+    max-height: 250px;
     overflow-y: auto;
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
