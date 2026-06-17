@@ -83,6 +83,23 @@ export interface ToolResult {
   isError: boolean;
 }
 
+export interface ChatHistoryItem {
+  type: "user" | "assistant" | "tool-result" | "error";
+  text?: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  toolResult?: ToolResult;
+}
+
+export interface ChatHistorySession {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  chatHistory: ChatHistoryItem[];
+  agentMessages: UnifiedMessage[];
+}
+
 // ─── Agent Loop Callbacks ───────────────────────────────────────────────────
 
 export interface AgentCallbacks {

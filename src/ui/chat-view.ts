@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import { mount, unmount } from "svelte";
 import type ChatPlugin from "../main";
 import ChatContainer from "./ChatContainer.svelte";
+import { ChatHistoryModal } from "./ChatHistoryModal";
 import type { ToolResult, SelectionScope } from "../types";
 import { getModelDisplayName } from "../settings";
 
@@ -51,6 +52,7 @@ export class ObsidianChatView extends ItemView {
           this.handleUserMessage(text, selection),
         onClear: () => this.handleClear(),
         onStop: () => this.handleStop(),
+        onHistory: () => this.plugin.openChatHistory(),
       },
     });
 
@@ -94,6 +96,35 @@ export class ObsidianChatView extends ItemView {
   /** Programmatically send a message */
   sendMessage(text: string): void {
     this.handleUserMessage(text, this.chatContainer?.getSelection() ?? null);
+  }
+
+  /** Open history modal */
+  private openHistory(): void {
+    this.plugin.openChatHistory();
+  }
+
+  public refreshConversation(): void {
+    if (!this.chatContainer) return;
+    this.chatContainer.clearMessages();
+    for (const msg of this.plugin.chatHistory) {
+      switch (msg.type) {
+        case "user":
+          this.chatContainer.addUserMessage(msg.text!);
+          break;
+        case "assistant":
+          this.chatContainer.addAssistantMessage(msg.text!);
+          break;
+        case "tool-result":
+          if (msg.toolName && msg.toolResult) {
+            const id = this.chatContainer.addToolCall(msg.toolName, msg.toolInput || {});
+            this.chatContainer.updateToolResult(id, msg.toolName, msg.toolResult);
+          }
+          break;
+        case "error":
+          this.chatContainer.addError(msg.text!);
+          break;
+      }
+    }
   }
 
   /** Set the selection scope and show the pill */

@@ -8,10 +8,12 @@
   TFile,
   type TAbstractFile,
 } from "obsidian";
-import type { ChatSettings, SelectionScope } from "./types";
+import type { ChatSettings, ChatHistorySession, ChatHistoryItem, SelectionScope } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 import { ChatSettingTab, getModelDisplayName } from "./settings";
 import { ObsidianChatView, VIEW_TYPE_CHAT } from "./ui/chat-view";
+import { ChatHistoryModal } from "./ui/ChatHistoryModal";
+import { SessionNameModal } from "./ui/SessionNameModal";
 import { AgentLoop } from "./agent/loop";
 
 export default class ChatPlugin extends Plugin {
@@ -19,7 +21,9 @@ export default class ChatPlugin extends Plugin {
   /** Shared agent loop that persists across view open/close cycles */
   agent!: AgentLoop;
   /** Chat messages for replaying into the UI when the view reopens */
-  chatHistory: Array<{ type: string; text?: string; toolName?: string; toolInput?: Record<string, unknown>; toolResult?: { result: string; isError: boolean } }> = [];
+  chatHistory: ChatHistoryItem[] = [];
+  /** Archived chat sessions that can be restored later */
+  chatSessions: ChatHistorySession[] = [];
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -60,6 +64,12 @@ export default class ChatPlugin extends Plugin {
       id: "open-chat",
       name: "Open chat",
       callback: () => this.openChat(),
+    });
+
+    this.addCommand({
+      id: "view-chat-history",
+      name: "View chat history",
+      callback: () => this.openChatHistory(),
     });
 
     this.addCommand({
@@ -234,6 +244,30 @@ export default class ChatPlugin extends Plugin {
     });
   }
 
+  public openChatHistory(): void {
+    new ChatHistoryModal(this.app, {
+      sessions: this.chatSessions,
+      canArchive: this.chatHistory.length > 0 || this.agent.exportMessages().length > 0,
+      onArchive: async () => {
+        // Prompt for a session name before archiving
+        const modal = new SessionNameModal(this.app, this.buildSessionTitle());
+        const name = await modal.openPrompt();
+        if (name === null) return; // user cancelled
+        if (this.archiveCurrentSession(name)) {
+          new Notice("Current session saved to history.");
+          void this.saveChatHistory();
+        } else {
+          new Notice("当前没有可保存的会话。");
+        }
+      },
+      onRestore: (id: string) => this.restoreSession(id),
+      onDelete: (id: string) => {
+        this.chatSessions = this.chatSessions.filter((session) => session.id !== id);
+        void this.saveChatHistory();
+      },
+    }).open();
+  }
+
   private clearChat(): void {
     const view = this.getChatView();
     if (view) {
@@ -244,6 +278,54 @@ export default class ChatPlugin extends Plugin {
     }
   }
 
+  private archiveCurrentSession(title?: string): boolean {
+    if (this.chatHistory.length === 0 && this.agent.exportMessages().length === 0) {
+      return false;
+    }
+
+    const now = new Date().toISOString();
+    const session: ChatHistorySession = {
+      id: `session-${Date.now()}`,
+      title: title && title.length > 0 ? title : this.buildSessionTitle(),
+      createdAt: now,
+      updatedAt: now,
+      chatHistory: JSON.parse(JSON.stringify(this.chatHistory)),
+      agentMessages: JSON.parse(JSON.stringify(this.agent.exportMessages())),
+    };
+
+    this.chatSessions.unshift(session);
+    this.chatSessions = this.chatSessions.slice(0, 50);
+    return true;
+  }
+
+  private buildSessionTitle(): string {
+    const firstUser = this.chatHistory.find((msg) => msg.type === "user" && msg.text);
+    if (firstUser?.text) {
+      const text = firstUser.text.trim().replace(/\s+/g, " ");
+      return text.length <= 50 ? text : `${text.slice(0, 47)}...`;
+    }
+    return `Session ${new Date().toLocaleString()}`;
+  }
+
+  private restoreSession(id: string): void {
+    const session = this.chatSessions.find((item) => item.id === id);
+    if (!session) {
+      new Notice("Session not found.");
+      return;
+    }
+
+    this.chatHistory = JSON.parse(JSON.stringify(session.chatHistory));
+    this.agent.importMessages(JSON.parse(JSON.stringify(session.agentMessages)));
+    void this.saveChatHistory();
+
+    const view = this.getChatView();
+    if (view) {
+      view.refreshConversation();
+    }
+
+    new Notice(`Restored session "${session.title}".`);
+  }
+
   // ─── Chat history persistence ─────────────────────────────────────────
 
   async saveChatHistory(): Promise<void> {
@@ -251,6 +333,7 @@ export default class ChatPlugin extends Plugin {
       const state = {
         chatHistory: this.chatHistory.slice(-100), // Cap at 100 UI messages
         agentMessages: this.agent.exportMessages().slice(-80), // Cap at 80 API messages
+        sessions: this.chatSessions,
       };
       await this.app.vault.adapter.write(
         ".obsidian/plugins/obsidian-chat/chat-state.json",
@@ -272,6 +355,9 @@ export default class ChatPlugin extends Plugin {
       }
       if (Array.isArray(state.agentMessages)) {
         this.agent.importMessages(state.agentMessages);
+      }
+      if (Array.isArray(state.sessions)) {
+        this.chatSessions = state.sessions;
       }
     } catch {
       // No saved state or parse error — start fresh
