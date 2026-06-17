@@ -572,6 +572,7 @@
   </div>
 
   <div class="ochat-bottom-actions">
+    <div class="ochat-footer-spacer"></div>
     {#if !isMobileDevice() && inputEnabled}
       <button
         class="ochat-add-file-btn"
@@ -596,6 +597,7 @@
       disabled={!inputEnabled}
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+      <span class="ochat-send-label">chat</span>
     </button>
   </div>
 </div>
@@ -892,12 +894,66 @@
   .ochat-bottom-actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 8px;
     padding: 8px 12px;
     border-top: 1px solid var(--background-modifier-border);
     background: var(--background-secondary);
     flex-shrink: 0;
+  }
+
+  .ochat-footer-spacer {
+    flex: 1 1 0;
+  }
+
+  .ochat-send-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    height: 40px;
+    min-width: 92px;
+    border: none;
+    border-radius: 999px;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: none;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .ochat-send-label {
+    text-transform: lowercase;
+    font-size: var(--font-ui-small);
+  }
+
+  .ochat-send-btn:hover {
+    background-color: var(--interactive-accent-hover);
+  }
+
+  .ochat-add-file-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--background-modifier-border-hover);
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .ochat-add-file-btn:hover {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
   }
 
   .ochat-add-file-btn {
