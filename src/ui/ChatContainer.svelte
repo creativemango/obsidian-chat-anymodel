@@ -327,13 +327,13 @@
     );
 
     if (!isTagSearch && !isFolderSearch && !isFileSearch) {
-      suggestions.push(...fileItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)).slice(0, 8));
-      suggestions.push(...folderItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)).slice(0, 5));
-      suggestions.push(...tagItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized)).slice(0, 5));
+      suggestions.push(...fileItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)).slice(0, 15));
+      suggestions.push(...folderItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)).slice(0, 10));
+      suggestions.push(...tagItems.filter(item => normalized.length === 0 || item.title.toLowerCase().includes(normalized)).slice(0, 8));
     } else {
-      suggestions.push(...fileMatches.slice(0, 8));
-      suggestions.push(...folderMatches.slice(0, 5));
-      suggestions.push(...tagMatches.slice(0, 5));
+      suggestions.push(...fileMatches.slice(0, 15));
+      suggestions.push(...folderMatches.slice(0, 10));
+      suggestions.push(...tagMatches.slice(0, 8));
     }
 
     noteSuggestions = suggestions;
@@ -570,25 +570,31 @@
 
   .ochat-note-suggestions {
     position: absolute;
-    left: 12px;
-    right: 12px;
+    left: 0;
+    right: 0;
     bottom: 100%;
-    max-height: 220px;
+    max-height: 500px;
     overflow-y: auto;
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
-    box-shadow: var(--shadow-elevation-3);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
     z-index: 1000;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
   }
 
   .ochat-note-suggestion {
-    padding: 10px 12px;
+    padding: 12px 16px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    transition: background 0.12s ease;
+  }
+
+  .ochat-note-suggestion:last-child {
+    border-bottom: none;
   }
 
   .ochat-note-suggestion:hover,
@@ -598,6 +604,7 @@
 
   .ochat-note-title {
     font-size: var(--font-ui-medium);
+    font-weight: 500;
     color: var(--text-normal);
   }
 
