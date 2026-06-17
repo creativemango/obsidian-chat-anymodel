@@ -12,6 +12,11 @@
     toolResult?: ToolResult;
   }
 
+  interface ExternalContext {
+    path: string;
+    title: string;
+  }
+
   interface Props {
     app: App;
     component: ObsidianComponent;
@@ -51,6 +56,15 @@
   let showNoteSuggestions = $state(false);
   let mentionRange: { start: number; end: number } | null = $state(null);
   let highlightedSuggestion = $state(0);
+
+  // External contexts (for desktop only)
+  let externalContexts = $state<ExternalContext[]>([]);
+  let fileInputEl: HTMLInputElement | undefined = $state();
+  
+  // Detect if device is mobile
+  function isMobileDevice(): boolean {
+    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  }
 
   // ask_user support
   let askUserResolve: ((value: string) => void) | null = $state(null);
@@ -156,6 +170,28 @@
   /** Clear the selection scope */
   export function clearSelection(): void {
     selection = null;
+  }
+
+  /** Add external context file */
+  export function addExternalContext(path: string): void {
+    const existing = externalContexts.find((ctx) => ctx.path === path);
+    if (!existing) {
+      const fileName = path.split("/").pop() || path;
+      externalContexts.push({ path, title: fileName });
+    }
+  }
+
+  /** Remove external context */
+  export function removeExternalContext(path: string): void {
+    const idx = externalContexts.findIndex((ctx) => ctx.path === path);
+    if (idx !== -1) {
+      externalContexts.splice(idx, 1);
+    }
+  }
+
+  /** Get all external contexts */
+  export function getExternalContexts(): ExternalContext[] {
+    return externalContexts;
   }
 
   // ─── Internal handlers ────────────────────────────────────────────────
@@ -365,6 +401,18 @@
     if (str.length <= max) return str;
     return str.substring(0, max) + "\n... (truncated)";
   }
+
+  function handleAddFile(): void {
+    fileInputEl?.click();
+  }
+
+  function handleFileInput(event: Event): void {
+    // Note: In browser context within Obsidian, this behaves as a vault file selector
+    // The actual file content would be loaded via Obsidian APIs in the loop
+    const input = event.target as HTMLInputElement;
+    // For now, we'll use the file names as paths
+    // In practice, this would be bound to actual file selection from vault
+  }
 </script>
 
 <div class="ochat-container">
@@ -452,6 +500,27 @@
     </div>
   {/if}
 
+  <!-- External contexts (desktop only) -->
+  {#if !isMobileDevice() && externalContexts.length > 0}
+    <div class="ochat-external-contexts">
+      <div class="ochat-external-title">External contexts</div>
+      <div class="ochat-contexts-list">
+        {#each externalContexts as context}
+          <div class="ochat-context-item">
+            <span class="ochat-context-name">{context.title}</span>
+            <button
+              class="ochat-context-remove"
+              onclick={() => removeExternalContext(context.path)}
+              aria-label="Remove context"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   <!-- Input bar -->
   <div class="ochat-input-bar">
     <textarea
@@ -491,6 +560,22 @@
           </div>
         {/each}
       </div>
+    {/if}
+    {#if !isMobileDevice() && inputEnabled}
+      <button
+        class="ochat-add-file-btn"
+        onclick={handleAddFile}
+        aria-label="Add external context"
+        title="Add external context"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg>
+      </button>
+      <input
+        type="file"
+        bind:this={fileInputEl}
+        style="display: none;"
+        onchange={handleFileInput}
+      />
     {/if}
     {#if inputEnabled}
       <button
@@ -823,6 +908,88 @@
 
   .ochat-input:disabled {
     opacity: 0.5;
+  }
+
+  /* ─── External Contexts ─────────────────────────────────────────────── */
+  .ochat-external-contexts {
+    padding: 8px 12px;
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary-alt);
+  }
+
+  .ochat-external-title {
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .ochat-contexts-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .ochat-context-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smaller);
+  }
+
+  .ochat-context-name {
+    color: var(--text-normal);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ochat-context-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .ochat-context-remove:hover {
+    color: var(--text-error);
+  }
+
+  .ochat-add-file-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--background-modifier-border-hover);
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .ochat-add-file-btn:hover {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
   }
 
   .ochat-send-btn {
