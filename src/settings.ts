@@ -238,7 +238,23 @@ export class ChatSettingTab extends PluginSettingTab {
             })
         );
     }
-
+    // ─── Session retention ───────────────────────────────────────────────
+    new Setting(containerEl)
+      .setName("Session retention")
+      .setDesc("Keep archived conversations for this many days before automatically deleting them.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("1", "1 day")
+          .addOption("7", "7 days")
+          .addOption("30", "30 days")
+          .addOption("90", "90 days")
+          .addOption("0", "Permanent")
+          .setValue(String(s.chatRetentionDays ?? 30))
+          .onChange(async (value) => {
+            s.chatRetentionDays = parseInt(value, 10);
+            await this.plugin.saveSettings();
+          })
+      );
     // ─── Max iterations ───────────────────────────────────────────────
     new Setting(containerEl)
       .setName("Max tool iterations")

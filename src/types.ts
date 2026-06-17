@@ -9,6 +9,7 @@ export interface ChatSettings {
   maxIterations: number;
   enableWebSearch: boolean;
   baseUrl: string;
+  chatRetentionDays: number;
 }
 
 export const DEFAULT_SETTINGS: ChatSettings = {
@@ -18,6 +19,7 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   maxIterations: 20,
   enableWebSearch: true,
   baseUrl: "",
+  chatRetentionDays: 30,
 };
 
 // ─── Unified Message Format ─────────────────────────────────────────────────

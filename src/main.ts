@@ -245,6 +245,10 @@ export default class ChatPlugin extends Plugin {
   }
 
   public openChatHistory(): void {
+    if (this.cleanupExpiredSessions()) {
+      void this.saveChatHistory();
+    }
+
     new ChatHistoryModal(this.app, {
       sessions: this.chatSessions,
       canArchive: this.chatHistory.length > 0 || this.agent.exportMessages().length > 0,
@@ -345,6 +349,7 @@ export default class ChatPlugin extends Plugin {
 
   async saveChatHistory(): Promise<void> {
     try {
+      this.cleanupExpiredSessions();
       const state = {
         chatHistory: this.chatHistory.slice(-100), // Cap at 100 UI messages
         agentMessages: this.agent.exportMessages().slice(-80), // Cap at 80 API messages
@@ -374,9 +379,27 @@ export default class ChatPlugin extends Plugin {
       if (Array.isArray(state.sessions)) {
         this.chatSessions = state.sessions;
       }
+      if (this.cleanupExpiredSessions()) {
+        await this.saveChatHistory();
+      }
     } catch {
       // No saved state or parse error — start fresh
     }
+  }
+
+  private cleanupExpiredSessions(): boolean {
+    const days = this.settings.chatRetentionDays ?? 30;
+    if (days === 0) {
+      return false;
+    }
+
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const originalLength = this.chatSessions.length;
+    this.chatSessions = this.chatSessions.filter((session) => {
+      return new Date(session.updatedAt).getTime() >= cutoff;
+    });
+
+    return this.chatSessions.length !== originalLength;
   }
 
   // ─── Settings persistence ────────────────────────────────────────────
