@@ -38,6 +38,20 @@
   // Selection scope (shown as a pill above input)
   let selection = $state<SelectionScope | null>(null);
 
+  // @ mention autocomplete for files, folders, tags, and current file
+  interface MentionSuggestion {
+    kind: "file" | "folder" | "tag" | "current";
+    path: string;
+    title: string;
+    subtitle: string;
+    insert: string;
+  }
+
+  let noteSuggestions = $state<MentionSuggestion[]>([]);
+  let showNoteSuggestions = $state(false);
+  let mentionRange: { start: number; end: number } | null = $state(null);
+  let highlightedSuggestion = $state(0);
+
   // ask_user support
   let askUserResolve: ((value: string) => void) | null = $state(null);
 
@@ -168,6 +182,27 @@
   }
 
   function handleKeydown(e: KeyboardEvent): void {
+    if (showNoteSuggestions) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        highlightedSuggestion = Math.min(highlightedSuggestion + 1, noteSuggestions.length - 1);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        highlightedSuggestion = Math.max(highlightedSuggestion - 1, 0);
+        return;
+      }
+      if (e.key === "Enter" && highlightedSuggestion >= 0 && noteSuggestions.length > 0) {
+        e.preventDefault();
+        selectNoteSuggestion(highlightedSuggestion);
+        return;
+      }
+      if (e.key === "Escape") {
+        showNoteSuggestions = false;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -183,6 +218,127 @@
   function resetHeight(): void {
     if (!textareaEl) return;
     textareaEl.style.height = "auto";
+  }
+
+  function selectNoteSuggestion(index: number): void {
+    const suggestion = noteSuggestions[index];
+    if (!suggestion || !mentionRange || !textareaEl) return;
+
+    const before = inputText.slice(0, mentionRange.start);
+    const after = inputText.slice(mentionRange.end);
+    inputText = `${before}${suggestion.insert}${after}`;
+    showNoteSuggestions = false;
+    mentionRange = null;
+    textareaEl.focus();
+  }
+
+  function gatherFolders(folder: any, results: { path: string; title: string }[]): void {
+    const children = (folder.children || []) as any[];
+    for (const child of children) {
+      if (child instanceof Object && child.children) {
+        results.push({ path: child.path, title: child.name });
+        gatherFolders(child, results);
+      }
+    }
+  }
+
+  function updateNoteSuggestions(): void {
+    const cursorPos = textareaEl?.selectionStart ?? inputText.length;
+    const textBefore = inputText.slice(0, cursorPos);
+    const match = textBefore.match(/@([\w\-\u4e00-\u9fa5:\/#\s]*)$/);
+    if (!match) {
+      showNoteSuggestions = false;
+      mentionRange = null;
+      return;
+    }
+
+    const rawQuery = match[1].trim();
+    const query = rawQuery.toLowerCase();
+    const start = cursorPos - match[0].length;
+    mentionRange = { start, end: cursorPos };
+
+    const currentFile = app.workspace.getActiveFile();
+    const fileItems = app.vault.getMarkdownFiles().map((file) => ({
+      kind: "file" as const,
+      path: file.path,
+      title: file.basename,
+      subtitle: file.path,
+      insert: `[[${file.basename}]]`,
+    }));
+
+    const folders: { path: string; title: string }[] = [];
+    gatherFolders(app.vault.getRoot(), folders);
+    const folderItems = folders.map((folder) => ({
+      kind: "folder" as const,
+      path: folder.path,
+      title: folder.title,
+      subtitle: folder.path,
+      insert: `@folder:${folder.path}`,
+    }));
+
+    const tagMap = new Map<string, string>();
+    for (const file of app.vault.getMarkdownFiles()) {
+      const cache = app.metadataCache.getFileCache(file);
+      const tags = cache?.tags ?? [];
+      for (const tag of tags) {
+        tagMap.set(tag.tag, tag.tag);
+      }
+    }
+    const tagItems = Array.from(tagMap.values()).map((tag) => ({
+      kind: "tag" as const,
+      path: tag,
+      title: tag,
+      subtitle: "tag",
+      insert: `@tag:${tag.replace(/^#/, "")}`,
+    }));
+
+    const suggestions: MentionSuggestion[] = [];
+    if (currentFile) {
+      suggestions.push({
+        kind: "current",
+        path: currentFile.path,
+        title: "Current file",
+        subtitle: currentFile.path,
+        insert: "@current",
+      });
+    }
+
+    const normalized = query.replace(/^folder:/, "").replace(/^tag:/, "").replace(/^file:/, "").trim();
+    const isFolderSearch = query.startsWith("folder:");
+    const isTagSearch = query.startsWith("tag:");
+    const isFileSearch = query.startsWith("file:");
+
+    const fileMatches = fileItems.filter((item) =>
+      !isFolderSearch && !isTagSearch && (isFileSearch || normalized.length === 0)
+        ? item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)
+        : false
+    );
+
+    const folderMatches = folderItems.filter((item) =>
+      !isTagSearch && (isFolderSearch || normalized.length === 0)
+        ? item.title.toLowerCase().includes(normalized) || item.subtitle.toLowerCase().includes(normalized)
+        : false
+    );
+
+    const tagMatches = tagItems.filter((item) =>
+      (isTagSearch || normalized.length === 0)
+        ? item.title.toLowerCase().includes(normalized)
+        : false
+    );
+
+    if (!isTagSearch && !isFolderSearch && !isFileSearch) {
+      suggestions.push(...fileItems.slice(0, 8));
+      suggestions.push(...folderItems.slice(0, 5));
+      suggestions.push(...tagItems.slice(0, 5));
+    } else {
+      suggestions.push(...fileMatches.slice(0, 8));
+      suggestions.push(...folderMatches.slice(0, 5));
+      suggestions.push(...tagMatches.slice(0, 5));
+    }
+
+    noteSuggestions = suggestions;
+    showNoteSuggestions = noteSuggestions.length > 0;
+    highlightedSuggestion = 0;
   }
 
   // Render markdown into a DOM node using Obsidian's renderer
@@ -306,8 +462,33 @@
       disabled={!inputEnabled}
       rows="1"
       onkeydown={handleKeydown}
-      oninput={autoGrow}
+      oninput={() => {
+        autoGrow();
+        updateNoteSuggestions();
+      }}
+      onfocus={updateNoteSuggestions}
+      onblur={() => {
+        setTimeout(() => {
+          showNoteSuggestions = false;
+        }, 150);
+      }}
     ></textarea>
+    {#if showNoteSuggestions}
+      <div class="ochat-note-suggestions">
+        {#each noteSuggestions as suggestion, index}
+          <div
+            class="ochat-note-suggestion {index === highlightedSuggestion ? 'active' : ''}"
+            onmousedown={(event) => {
+              event.preventDefault();
+              selectNoteSuggestion(index);
+            }}
+          >
+            <div class="ochat-note-title">{suggestion.title}</div>
+            <div class="ochat-note-path">{suggestion.path}</div>
+          </div>
+        {/each}
+      </div>
+    {/if}
     {#if inputEnabled}
       <button
         class="ochat-send-btn"
@@ -382,6 +563,44 @@
     cursor: pointer;
     padding: 4px 8px;
     border-radius: var(--radius-s);
+  }
+
+  .ochat-note-suggestions {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 58px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow-elevation-3);
+    z-index: 10;
+  }
+
+  .ochat-note-suggestion {
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .ochat-note-suggestion:hover,
+  .ochat-note-suggestion.active {
+    background: var(--background-modifier-hover);
+  }
+
+  .ochat-note-title {
+    font-size: var(--font-ui-medium);
+    color: var(--text-normal);
+  }
+
+  .ochat-note-path {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    word-break: break-all;
   }
 
   .ochat-clear-btn:hover,

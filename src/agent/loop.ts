@@ -1,4 +1,4 @@
-import { App } from "obsidian";
+import { App, TFile, TFolder } from "obsidian";
 import type {
   ChatSettings,
   UnifiedMessage,
@@ -131,6 +131,110 @@ export class AgentLoop {
     return parts.join("\n");
   }
 
+  private async buildMentionContext(userMessage: string): Promise<string> {
+    const tokens = this.extractMentionTokens(userMessage);
+    if (tokens.length === 0) {
+      return "";
+    }
+
+    const parts: string[] = ["[Mention context: include the following note content as additional context for the user request.]"];
+
+    for (const token of tokens) {
+      if (token === "current") {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile) {
+          try {
+            const content = await this.app.vault.cachedRead(activeFile);
+            parts.push(`Current file: ${activeFile.path}`);
+            parts.push("```\n" + content.slice(0, 2000) + "\n```");
+          } catch {
+            // ignore read errors
+          }
+        }
+      } else if (token.startsWith("folder:")) {
+        const folderPath = token.slice("folder:".length);
+        const folder = this.app.vault.getAbstractFileByPath(folderPath) as TFolder | null;
+        if (folder && folder instanceof Object && "children" in folder) {
+          parts.push(`Folder: ${folderPath}`);
+          const files = this.collectMarkdownFilesInFolder(folder, 10);
+          for (const file of files) {
+            try {
+              const content = await this.app.vault.cachedRead(file);
+              parts.push(`File: ${file.path}`);
+              parts.push("```\n" + content.slice(0, 1200) + "\n```");
+            } catch {
+              // ignore read errors
+            }
+          }
+        }
+      } else if (token.startsWith("tag:")) {
+        const tagValue = token.slice("tag:".length);
+        const files = this.findFilesByTag(tagValue, 10);
+        if (files.length > 0) {
+          parts.push(`Tag: ${tagValue}`);
+          for (const file of files) {
+            try {
+              const content = await this.app.vault.cachedRead(file);
+              parts.push(`File: ${file.path}`);
+              parts.push("```\n" + content.slice(0, 1200) + "\n```");
+            } catch {
+              // ignore read errors
+            }
+          }
+        }
+      }
+    }
+
+    return parts.join("\n");
+  }
+
+  private extractMentionTokens(text: string): string[] {
+    const tokens: string[] = [];
+    const regex = /@current|@folder:([^\s]+)|@tag:([^\s]+)/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      if (match[0] === "@current") {
+        tokens.push("current");
+      } else if (match[1]) {
+        tokens.push(`folder:${match[1]}`);
+      } else if (match[2]) {
+        tokens.push(`tag:${match[2]}`);
+      }
+    }
+    return tokens;
+  }
+
+  private collectMarkdownFilesInFolder(folder: TFolder, limit: number): TFile[] {
+    const results: TFile[] = [];
+    const collect = (f: TFolder): void => {
+      for (const child of f.children) {
+        if (child instanceof TFile && child.extension === "md") {
+          results.push(child);
+          if (results.length >= limit) return;
+        } else if (child instanceof TFolder) {
+          collect(child);
+          if (results.length >= limit) return;
+        }
+      }
+    };
+    collect(folder);
+    return results;
+  }
+
+  private findFilesByTag(tagValue: string, limit: number): TFile[] {
+    const files: TFile[] = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      const tags = cache?.tags ?? [];
+      const normalizedTag = tagValue.startsWith("#") ? tagValue : `#${tagValue}`;
+      if (tags.some((tag) => tag.tag === normalizedTag)) {
+        files.push(file);
+        if (files.length >= limit) break;
+      }
+    }
+    return files;
+  }
+
   /** Run one user turn through the agentic loop */
   async run(
     userMessage: string,
@@ -145,9 +249,13 @@ export class AgentLoop {
 
     // If there's a selection, inject it as scoped context
     let fullMessage: string;
+    const mentionContext = await this.buildMentionContext(userMessage);
+
     if (selection) {
       fullMessage = [
         contextPrefix,
+        "",
+        mentionContext,
         "",
         `[Selection scope: The user has selected text in ${selection.filePath}. Work only within this selection. When using edit_document, use find_replace with text from within this selection. Do not modify text outside the selection.]`,
         "",
@@ -157,7 +265,7 @@ export class AgentLoop {
         userMessage,
       ].join("\n");
     } else {
-      fullMessage = `${contextPrefix}\n\n${userMessage}`;
+      fullMessage = [contextPrefix, "", mentionContext, "", userMessage].join("\n");
     }
 
     this.messages.push({ role: "user", content: fullMessage });
