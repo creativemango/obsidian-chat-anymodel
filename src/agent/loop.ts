@@ -132,7 +132,7 @@ export class AgentLoop {
   }
 
   private async buildExternalContext(
-    externalContexts: Array<{ path: string; title: string }>
+    externalContexts: Array<{ path: string; title: string; content?: string }>
   ): Promise<string> {
     if (externalContexts.length === 0) {
       return "";
@@ -141,14 +141,19 @@ export class AgentLoop {
     const parts: string[] = ["[External context: include the following files as additional context for the user request.]"];
 
     for (const ctx of externalContexts) {
-      const file = this.app.vault.getAbstractFileByPath(ctx.path) as TFile | null;
-      if (file && file instanceof TFile) {
-        try {
-          const content = await this.app.vault.cachedRead(file);
-          parts.push(`File: ${file.path}`);
-          parts.push("```\n" + content.slice(0, 2000) + "\n```");
-        } catch {
-          // ignore read errors
+      if (ctx.content && ctx.content.length > 0) {
+        parts.push(`File: ${ctx.title || ctx.path}`);
+        parts.push("```\n" + ctx.content.slice(0, 2000) + "\n```");
+      } else {
+        const file = this.app.vault.getAbstractFileByPath(ctx.path) as TFile | null;
+        if (file && file instanceof TFile) {
+          try {
+            const content = await this.app.vault.cachedRead(file);
+            parts.push(`File: ${file.path}`);
+            parts.push("```\n" + content.slice(0, 2000) + "\n```");
+          } catch {
+            // ignore read errors
+          }
         }
       }
     }
@@ -265,7 +270,7 @@ export class AgentLoop {
     userMessage: string,
     callbacks: AgentCallbacks,
     selection?: SelectionScope | null,
-    externalContexts?: Array<{ path: string; title: string }>
+    externalContexts?: Array<{ path: string; title: string; content?: string }>
   ): Promise<void> {
     this.aborted = false;
 

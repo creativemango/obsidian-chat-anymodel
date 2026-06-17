@@ -2,7 +2,6 @@
   import type { App, Component as ObsidianComponent } from "obsidian";
   import { MarkdownRenderer } from "obsidian";
   import type { ToolResult, SelectionScope } from "../types";
-  import { SelectContextModal } from "./SelectContextModal";
 
   interface ChatMessage {
     id: number;
@@ -16,6 +15,7 @@
   interface ExternalContext {
     path: string;
     title: string;
+    content: string;
   }
 
   interface Props {
@@ -60,7 +60,8 @@
 
   // External contexts (for desktop only)
   let externalContexts = $state<ExternalContext[]>([]);
-  
+  let fileInputEl: HTMLInputElement | undefined = $state();
+
   // Detect if device is mobile
   function isMobileDevice(): boolean {
     return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -173,11 +174,10 @@
   }
 
   /** Add external context file */
-  export function addExternalContext(path: string): void {
+  export function addExternalContext(path: string, title: string, content: string): void {
     const existing = externalContexts.find((ctx) => ctx.path === path);
     if (!existing) {
-      const fileName = path.split("/").pop() || path;
-      externalContexts.push({ path, title: fileName });
+      externalContexts.push({ path, title, content });
     }
   }
 
@@ -403,18 +403,23 @@
   }
 
   function handleAddFile(): void {
-    const modal = new SelectContextModal(app, (file) => {
-      addExternalContext(file.path);
-    });
-    modal.open();
+    fileInputEl?.click();
   }
 
   function handleFileInput(event: Event): void {
-    // Note: In browser context within Obsidian, this behaves as a vault file selector
-    // The actual file content would be loaded via Obsidian APIs in the loop
     const input = event.target as HTMLInputElement;
-    // For now, we'll use the file names as paths
-    // In practice, this would be bound to actual file selection from vault
+    if (!input.files?.length) return;
+
+    for (const file of Array.from(input.files)) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = typeof reader.result === "string" ? reader.result : "";
+        addExternalContext(file.name, file.name, content);
+      };
+      reader.readAsText(file);
+    }
+
+    input.value = "";
   }
 </script>
 
@@ -564,6 +569,9 @@
         {/each}
       </div>
     {/if}
+  </div>
+
+  <div class="ochat-bottom-actions">
     {#if !isMobileDevice() && inputEnabled}
       <button
         class="ochat-add-file-btn"
@@ -573,24 +581,22 @@
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg>
       </button>
+      <input
+        type="file"
+        bind:this={fileInputEl}
+        style="display: none;"
+        multiple
+        onchange={handleFileInput}
+      />
     {/if}
-    {#if inputEnabled}
-      <button
-        class="ochat-send-btn"
-        onclick={handleSend}
-        aria-label="Send message"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-      </button>
-    {:else}
-      <button
-        class="ochat-send-btn ochat-stop-btn"
-        onclick={onStop}
-        aria-label="Stop generation"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
-      </button>
-    {/if}
+    <button
+      class="ochat-send-btn"
+      onclick={handleSend}
+      aria-label="Send message"
+      disabled={!inputEnabled}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+    </button>
   </div>
 </div>
 
@@ -721,7 +727,9 @@
 
   /* ─── Messages ──────────────────────────────────────────────────────── */
   .ochat-messages {
-    flex: 3 1 0;
+    flex: 9 1 0;
+    min-height: 3rem;
+    max-height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 12px;
@@ -879,6 +887,42 @@
     background: transparent;
     flex-shrink: 0;
     position: relative;
+  }
+
+  .ochat-bottom-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    flex-shrink: 0;
+  }
+
+  .ochat-add-file-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--background-modifier-border-hover);
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .ochat-add-file-btn:hover {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
   }
 
   .ochat-input {
