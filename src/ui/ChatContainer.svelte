@@ -281,7 +281,7 @@
   function updateNoteSuggestions(): void {
     const cursorPos = textareaEl?.selectionStart ?? inputText.length;
     const textBefore = inputText.slice(0, cursorPos);
-    const match = textBefore.match(/@([\w\-\u4e00-\u9fa5:\/#\s]*)$/);
+    const match = textBefore.match(/@([\w\-\u4e00-\u9fa5:\/#\s.+_]*)$/);
     if (!match) {
       showNoteSuggestions = false;
       mentionRange = null;
@@ -427,13 +427,11 @@
   <!-- Header -->
   <div class="ochat-header">
     <div class="ochat-header-left">
-      <span class="ochat-header-title">Chat</span>
-      <span class="ochat-header-model">{displayModel || "No model"}</span>
-    </div>
-    <div class="ochat-header-actions">
-      <button class="ochat-new-btn" onclick={onNew} aria-label="New chat">+</button>
-      <button class="ochat-history-btn" onclick={onHistory}>History</button>
-      <button class="ochat-clear-btn" onclick={onClear}>Clear</button>
+      <div class="ochat-model-selector-header">
+        <span class="ochat-header-title">Chat</span>
+        <span class="ochat-model-tag">(free)</span>
+        <svg class="ochat-dropdown-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
     </div>
   </div>
 
@@ -491,51 +489,74 @@
     {/each}
   </div>
 
-  <!-- Selection pill -->
-  {#if selection}
-    <div class="ochat-selection-pill">
-      <div class="ochat-selection-content">
-        <span class="ochat-selection-label">Selection from {selection.filePath.split("/").pop()}</span>
-        <span class="ochat-selection-preview">{selection.text.substring(0, 80)}{selection.text.length > 80 ? "..." : ""}</span>
-      </div>
-      <button
-        class="ochat-selection-dismiss"
-        onclick={() => selection = null}
-        aria-label="Remove selection"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    </div>
-  {/if}
-
-  <!-- External contexts (desktop only) -->
-  {#if !isMobileDevice() && externalContexts.length > 0}
-    <div class="ochat-external-contexts">
-      <div class="ochat-external-title">External contexts</div>
-      <div class="ochat-contexts-list">
-        {#each externalContexts as context}
-          <div class="ochat-context-item">
-            <span class="ochat-context-name">{context.title}</span>
-            <button
-              class="ochat-context-remove"
-              onclick={() => removeExternalContext(context.path)}
-              aria-label="Remove context"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-          </div>
-        {/each}
-      </div>
-    </div>
-  {/if}
+  <div class="ochat-input-actions">
+    <button 
+      class="ochat-icon-btn ochat-new-btn" 
+      onclick={onNew} 
+      aria-label="New chat"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </button>
+    <button 
+      class="ochat-icon-btn ochat-history-btn" 
+      onclick={onHistory} 
+      aria-label="History"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 2L21 6 16 12"></path></svg>
+    </button>
+  </div>
 
   <div class="ochat-input-panel">
+    <div class="ochat-input-top">
+      <button 
+        class="ochat-at-btn" 
+        onclick={() => {
+          textareaEl?.focus();
+          
+          // Wait a tick to make sure focus is applied
+          setTimeout(() => {
+            if (!inputText.endsWith("@")) {
+              inputText += "@";
+              // Wait another tick for the state update
+              setTimeout(() => {
+                updateNoteSuggestions();
+              }, 0);
+            } else {
+              updateNoteSuggestions();
+            }
+          }, 0);
+        }}
+        aria-label="Add context"
+      >@</button>
+
+      {#if selection}
+        <div class="ochat-context-pill">
+          <span class="ochat-context-icon">📄</span>
+          <span class="ochat-context-text">{selection.filePath.split("/").pop()}</span>
+          <span class="ochat-context-sub">Current</span>
+          <button class="ochat-context-close" aria-label="Remove selection" onclick={() => selection = null}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      {/if}
+
+      {#each externalContexts as context}
+        <div class="ochat-context-pill">
+          <span class="ochat-context-icon">🔗</span>
+          <span class="ochat-context-text">{context.title}</span>
+          <button class="ochat-context-close" aria-label="Remove context" onclick={() => removeExternalContext(context.path)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      {/each}
+    </div>
+
     <div class="ochat-input-bar">
       <textarea
         class="ochat-input"
         bind:this={textareaEl}
         bind:value={inputText}
-        {placeholder}
+        placeholder="Your AI assistant for Obsidian • @ to add context • / for custom prompts"
         disabled={!inputEnabled}
         rows="1"
         onkeydown={handleKeydown}
@@ -571,34 +592,41 @@
       {/if}
     </div>
 
-    <div class="ochat-bottom-actions">
-      <div class="ochat-footer-spacer"></div>
-      {#if !isMobileDevice() && inputEnabled}
+    <div class="ochat-input-bottom">
+      <div class="ochat-model-selector">
+        <span class="ochat-model-name">{displayModel || "No model"}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+
+      <div class="ochat-bottom-right">
+        {#if !isMobileDevice() && inputEnabled}
+          <button
+            class="ochat-folder-btn"
+            onclick={handleAddFile}
+            aria-label="Add external context"
+            title="Add external context"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          </button>
+          <input
+            type="file"
+            bind:this={fileInputEl}
+            style="display: none;"
+            multiple
+            onchange={handleFileInput}
+          />
+        {/if}
         <button
-          class="ochat-add-file-btn"
-          onclick={handleAddFile}
-          aria-label="Add external context"
-          title="Add external context"
+          class="ochat-send-btn"
+          class:active={inputText.trim().length > 0}
+          onclick={handleSend}
+          aria-label="Send message"
+          disabled={!inputEnabled}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg>
+          <span class="ochat-send-label">chat</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10L4 15L9 20"></path><path d="M20 4V11C20 13.2091 18.2091 15 16 15H4"></path></svg>
         </button>
-        <input
-          type="file"
-          bind:this={fileInputEl}
-          style="display: none;"
-          multiple
-          onchange={handleFileInput}
-        />
-      {/if}
-      <button
-        class="ochat-send-btn"
-        onclick={handleSend}
-        aria-label="Send message"
-        disabled={!inputEnabled}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-        <span class="ochat-send-label">chat</span>
-      </button>
+      </div>
     </div>
   </div>
 </div>
@@ -617,46 +645,63 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
   }
 
   .ochat-header-left {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
+    align-items: center;
+  }
+
+  .ochat-model-selector-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .ochat-model-selector-header:hover {
+    background: var(--background-modifier-hover);
   }
 
   .ochat-header-title {
-    font-weight: var(--font-weight-bold, 600);
+    font-weight: 600;
     font-size: var(--font-ui-medium);
     color: var(--text-normal);
   }
 
-  .ochat-header-model {
+  .ochat-model-tag {
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
   }
 
-  .ochat-clear-btn {
-    font-size: var(--font-ui-smaller);
+  .ochat-dropdown-arrow {
     color: var(--text-muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius-s);
   }
 
-  .ochat-history-btn {
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    background: none;
+  .ochat-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
     border: none;
-    cursor: pointer;
-    padding: 4px 8px;
     border-radius: var(--radius-s);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .ochat-icon-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
   }
 
   .ochat-note-suggestions {
@@ -704,29 +749,6 @@
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
     word-break: break-all;
-  }
-
-  .ochat-clear-btn:hover,
-  .ochat-history-btn:hover,
-  .ochat-new-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-
-  .ochat-new-btn {
-    font-size: var(--font-ui-medium);
-    color: var(--text-muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px 10px;
-    border-radius: var(--radius-s);
-  }
-
-  .ochat-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
   }
 
   /* ─── Messages ──────────────────────────────────────────────────────── */
@@ -881,245 +903,194 @@
   }
 
   /* ─── Input Bar ─────────────────────────────────────────────────────── */
-  .ochat-input-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px 12px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--background-modifier-border);
-    border-bottom: 1px solid var(--background-modifier-border);
-    background: var(--background-secondary);
-    border-radius: var(--radius-m);
-    margin-top: 8px;
-    flex-shrink: 0;
-  }
-
-  .ochat-input-bar {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    position: relative;
-  }
-
-  .ochat-bottom-actions {
+  .ochat-input-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    padding-top: 4px;
-    background: transparent;
+    padding: 0 12px;
+    margin-bottom: 4px;
+  }
+
+  .ochat-input-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    border-radius: var(--radius-l);
+    margin: 12px;
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   }
 
-  .ochat-footer-spacer {
-    flex: 1 1 0;
-  }
-
-  .ochat-send-btn {
-    display: inline-flex;
+  .ochat-input-top {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    padding: 0 14px;
-    height: 40px;
-    min-width: 92px;
-    border: none;
-    border-radius: 999px;
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    cursor: pointer;
-    flex-shrink: 0;
-    box-shadow: none;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-
-  .ochat-send-label {
-    text-transform: lowercase;
-    font-size: var(--font-ui-small);
-  }
-
-  .ochat-send-btn:hover {
-    background-color: var(--interactive-accent-hover);
-  }
-
-  .ochat-add-file-btn {
-    width: 38px;
-    height: 38px;
-    min-width: 38px;
-    min-height: 38px;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background-color: var(--background-modifier-border-hover);
-    color: var(--text-muted);
-    cursor: pointer;
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.15s ease, color 0.15s ease;
-  }
-
-  .ochat-add-file-btn:hover {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-  }
-
-  .ochat-add-file-btn {
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-    min-height: 34px;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background-color: var(--background-modifier-border-hover);
-    color: var(--text-muted);
-    cursor: pointer;
-    flex-shrink: 0;
-    box-shadow: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1px;
-    transition: background-color 0.15s ease, color 0.15s ease;
-  }
-
-  .ochat-add-file-btn:hover {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-  }
-
-  .ochat-input {
-    flex: 1;
-    resize: none;
-    border: 1.5px solid var(--background-modifier-border-hover, var(--background-modifier-border));
-    border-radius: 20px;
-    padding: 8px 16px;
-    font-size: var(--font-ui-medium);
-    font-family: var(--font-interface);
-    background-color: var(--background-secondary);
-    color: var(--text-normal);
-    line-height: 1.4;
-    max-height: 300px;
-    overflow-y: auto;
-    box-shadow: none;
-  }
-
-  .ochat-input:focus {
-    outline: none;
-    border-color: var(--interactive-accent);
-    box-shadow: none;
-  }
-
-  .ochat-input:disabled {
-    opacity: 0.5;
-  }
-
-  /* ─── External Contexts ─────────────────────────────────────────────── */
-  .ochat-external-contexts {
-    padding: 8px 12px;
-    border-top: 1px solid var(--background-modifier-border);
-    background: var(--background-secondary-alt);
-  }
-
-  .ochat-external-title {
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
-    color: var(--text-muted);
     margin-bottom: 8px;
   }
 
-  .ochat-contexts-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .ochat-context-item {
+  .ochat-at-btn {
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    background: var(--background-primary);
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .ochat-at-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .ochat-context-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     font-size: var(--font-ui-smaller);
   }
 
-  .ochat-context-name {
-    color: var(--text-normal);
-    max-width: 150px;
+  .ochat-context-icon {
+    font-size: 12px;
+  }
+
+  .ochat-context-text {
+    max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--text-normal);
   }
 
-  .ochat-context-remove {
+  .ochat-context-sub {
+    color: var(--text-muted);
+    font-size: 10px;
+    margin-left: 2px;
+  }
+
+  .ochat-context-close {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
-    padding: 0;
     background: none;
     border: none;
+    padding: 0;
+    margin-left: 4px;
     color: var(--text-muted);
     cursor: pointer;
-    flex-shrink: 0;
   }
 
-  .ochat-context-remove:hover {
+  .ochat-context-close:hover {
     color: var(--text-error);
   }
 
-  .ochat-add-file-btn {
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-    min-height: 34px;
-    padding: 0;
+  .ochat-input-bar {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    margin-bottom: 8px;
+  }
+
+  .ochat-input {
+    width: 100%;
+    resize: none;
     border: none;
-    border-radius: 50%;
-    background-color: var(--background-modifier-border-hover);
+    padding: 0;
+    font-size: var(--font-ui-medium);
+    font-family: var(--font-interface);
+    background: transparent;
+    color: var(--text-normal);
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .ochat-input:focus {
+    outline: none;
+  }
+
+  .ochat-input-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .ochat-model-selector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
     cursor: pointer;
-    flex-shrink: 0;
-    box-shadow: none;
+    padding: 4px 8px;
+    border-radius: var(--radius-s);
+    margin-left: -4px;
+  }
+
+  .ochat-model-selector:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .ochat-bottom-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ochat-folder-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1px;
-    transition: background-color 0.15s ease, color 0.15s ease;
+    background: none;
+    border: none;
+    padding: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-s);
   }
 
-  .ochat-add-file-btn:hover {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
+  .ochat-folder-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
   }
 
   .ochat-send-btn {
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-    min-height: 34px;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    cursor: pointer;
-    flex-shrink: 0;
-    box-shadow: none;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    margin-bottom: 1px;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: var(--radius-m);
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
   }
 
-  .ochat-send-btn:hover {
-    background-color: var(--interactive-accent-hover);
+  .ochat-send-btn:hover:not(:disabled),
+  .ochat-send-btn.active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+
+  .ochat-send-label {
+    font-size: var(--font-ui-smaller);
   }
 
   .ochat-send-btn:disabled {
@@ -1127,84 +1098,15 @@
     cursor: not-allowed;
   }
 
-  /* ─── Selection Pill ─────────────────────────────────────────────────── */
-  .ochat-selection-pill {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 8px 8px 0;
-    padding: 6px 10px;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-m);
-    flex-shrink: 0;
-  }
-
-  .ochat-selection-content {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .ochat-selection-label {
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    font-weight: 500;
-  }
-
-  .ochat-selection-preview {
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .ochat-selection-dismiss {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: var(--background-modifier-hover);
-    color: var(--text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .ochat-selection-dismiss:hover {
-    background: var(--background-modifier-border);
-    color: var(--text-normal);
-  }
-
   /* ─── Responsive ────────────────────────────────────────────────────── */
   @media (max-width: 768px) {
-    .ochat-msg {
-      max-width: 95%;
-    }
-
-    .ochat-input-bar {
-      gap: 10px;
-      padding: 10px 12px;
-      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    .ochat-input-panel {
+      margin: 8px;
+      padding: 10px;
     }
 
     .ochat-input {
-      font-size: 16px; /* Prevents iOS zoom on focus */
-      padding: 10px 16px;
-      border-radius: 22px;
-    }
-
-    .ochat-send-btn {
-      width: 36px;
-      height: 36px;
-      min-width: 36px;
-      min-height: 36px;
+      font-size: 16px;
     }
   }
 </style>

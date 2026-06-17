@@ -163,6 +163,7 @@ export class ObsidianChatView extends ItemView {
     this.running = true;
     chat.addUserMessage(text);
     history.push({ type: "user", text });
+    this.plugin.activeSessionId = null; // 发送新消息时清除 activeSessionId，以便后续可以归档更新后的会话
     chat.setInputEnabled(false);
 
     const toolCallIds = new Map<string, number>();
@@ -235,6 +236,7 @@ export class ObsidianChatView extends ItemView {
     this.plugin.agent.abort();
     this.plugin.agent.clear();
     this.plugin.chatHistory = [];
+    this.plugin.activeSessionId = null; // 清空会话时重置 activeSessionId
     this.chatContainer?.clearMessages();
     this.running = false;
     this.chatContainer?.setInputEnabled(true);

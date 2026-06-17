@@ -1,4 +1,4 @@
-﻿import {
+import {
   Plugin,
   Platform,
   Notice,
@@ -24,6 +24,8 @@ export default class ChatPlugin extends Plugin {
   chatHistory: ChatHistoryItem[] = [];
   /** Archived chat sessions that can be restored later */
   chatSessions: ChatHistorySession[] = [];
+  /** ID of the currently active session (if restored from history) */
+  activeSessionId: string | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -293,6 +295,7 @@ export default class ChatPlugin extends Plugin {
     this.agent.abort();
     this.agent.clear();
     this.chatHistory = [];
+    this.activeSessionId = null; // 新会话开始时重置
     this.getChatView()?.refreshConversation();
     await this.saveChatHistory();
   }
@@ -300,6 +303,23 @@ export default class ChatPlugin extends Plugin {
   private archiveCurrentSession(title?: string): boolean {
     if (this.chatHistory.length === 0 && this.agent.exportMessages().length === 0) {
       return false;
+    }
+
+    // 检查是否是恢复的历史会话且内容没有变化
+    if (this.activeSessionId) {
+      const existingSession = this.chatSessions.find(s => s.id === this.activeSessionId);
+      if (existingSession) {
+        // 比较内容是否相同
+        const currentChatHistory = JSON.stringify(this.chatHistory);
+        const existingChatHistory = JSON.stringify(existingSession.chatHistory);
+        const currentAgentMessages = JSON.stringify(this.agent.exportMessages());
+        const existingAgentMessages = JSON.stringify(existingSession.agentMessages);
+        
+        if (currentChatHistory === existingChatHistory && currentAgentMessages === existingAgentMessages) {
+          // 内容相同，不需要重复归档
+          return false;
+        }
+      }
     }
 
     const now = new Date().toISOString();
@@ -335,6 +355,7 @@ export default class ChatPlugin extends Plugin {
 
     this.chatHistory = JSON.parse(JSON.stringify(session.chatHistory));
     this.agent.importMessages(JSON.parse(JSON.stringify(session.agentMessages)));
+    this.activeSessionId = id; // 记录当前恢复的会话 ID
     void this.saveChatHistory();
 
     const view = this.getChatView();
