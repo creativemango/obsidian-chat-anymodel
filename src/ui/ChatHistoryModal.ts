@@ -44,6 +44,10 @@ export class ChatHistoryModal extends Modal {
     const sorted = [...this.props.sessions].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     for (const session of sorted) {
       const item = list.createDiv({ cls: "ochat-history-item" });
+      item.onclick = () => {
+        this.props.onRestore(session.id);
+        this.close();
+      };
       item.createEl("div", { cls: "ochat-history-title", text: session.title });
       item.createEl("div", {
         cls: "ochat-history-meta",

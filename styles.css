@@ -13,3 +13,63 @@
 .workspace-leaf-content[data-type="ochat-view"] {
   min-width: 280px;
 }
+
+.ochat-history-modal .ochat-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.ochat-history-modal .ochat-history-item {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 12px;
+  background: var(--background-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ochat-history-modal .ochat-history-item:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.ochat-history-modal .ochat-history-title {
+  font-weight: var(--font-weight-bold, 600);
+  margin-bottom: 4px;
+}
+
+.ochat-history-modal .ochat-history-meta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.ochat-history-modal .ochat-history-preview {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 8px;
+}
+
+.ochat-history-modal .ochat-history-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ochat-history-modal .ochat-history-action {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--text-normal);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.ochat-history-modal .ochat-history-action:hover {
+  background: var(--background-modifier-hover);
+}

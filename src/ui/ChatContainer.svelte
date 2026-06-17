@@ -18,12 +18,13 @@
     provider: string;
     model: string;
     onSend: (text: string, selection: SelectionScope | null) => void;
+    onNew: () => void;
     onClear: () => void;
     onStop: () => void;
     onHistory: () => void;
   }
 
-  let { app, component, provider, model, onSend, onClear, onStop, onHistory }: Props = $props();
+  let { app, component, provider, model, onSend, onNew, onClear, onStop, onHistory }: Props = $props();
 
   let displayModel = $state("");
   let messages = $state<ChatMessage[]>([]);
@@ -218,6 +219,7 @@
       <span class="ochat-header-model">{displayModel || "No model"}</span>
     </div>
     <div class="ochat-header-actions">
+      <button class="ochat-new-btn" onclick={onNew} aria-label="New chat">+</button>
       <button class="ochat-history-btn" onclick={onHistory}>History</button>
       <button class="ochat-clear-btn" onclick={onClear}>Clear</button>
     </div>
@@ -383,9 +385,20 @@
   }
 
   .ochat-clear-btn:hover,
-  .ochat-history-btn:hover {
+  .ochat-history-btn:hover,
+  .ochat-new-btn:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
+  }
+
+  .ochat-new-btn {
+    font-size: var(--font-ui-medium);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: var(--radius-s);
   }
 
   .ochat-header-actions {

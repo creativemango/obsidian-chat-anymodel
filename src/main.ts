@@ -278,6 +278,21 @@ export default class ChatPlugin extends Plugin {
     }
   }
 
+  public async newChatSession(): Promise<void> {
+    const archived = this.archiveCurrentSession();
+    if (archived) {
+      new Notice("Previous session archived.");
+    } else {
+      new Notice("Starting a new chat.");
+    }
+
+    this.agent.abort();
+    this.agent.clear();
+    this.chatHistory = [];
+    this.getChatView()?.refreshConversation();
+    await this.saveChatHistory();
+  }
+
   private archiveCurrentSession(title?: string): boolean {
     if (this.chatHistory.length === 0 && this.agent.exportMessages().length === 0) {
       return false;

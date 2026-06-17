@@ -50,6 +50,7 @@ export class ObsidianChatView extends ItemView {
         model: getModelDisplayName(this.plugin.settings.provider, this.plugin.settings.model),
         onSend: (text: string, selection: SelectionScope | null) =>
           this.handleUserMessage(text, selection),
+        onNew: () => this.handleNewConversation(),
         onClear: () => this.handleClear(),
         onStop: () => this.handleStop(),
         onHistory: () => this.plugin.openChatHistory(),
@@ -226,6 +227,13 @@ export class ObsidianChatView extends ItemView {
       chat.focus();
     }
     this.plugin.saveChatHistory();
+  }
+
+  private async handleNewConversation(): Promise<void> {
+    this.plugin.agent.abort();
+    this.running = false;
+    await this.plugin.newChatSession();
+    this.chatContainer?.setInputEnabled(true);
   }
 
   private handleClear(): void {
