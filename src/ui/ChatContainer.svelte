@@ -44,6 +44,12 @@
   // Selection scope (shown as a pill above input)
   let selection = $state<SelectionScope | null>(null);
 
+  // Hidden mention tokens that should be sent to the agent but not displayed  
+  let hiddenMentions = $state<string[]>([]);
+  
+  // Timer for closing suggestions on blur
+  let closeSuggestionsTimer: any = null;
+
   // @ mention autocomplete for files, folders, tags, and current file
   interface MentionSuggestion {
     kind: "file" | "folder" | "tag" | "current";
@@ -146,6 +152,7 @@
   export function clearMessages(): void {
     messages = [];
     selection = null;
+    hiddenMentions = [];
     hideThinking();
   }
 
@@ -211,10 +218,17 @@
       return;
     }
 
+    // Prepend hidden mention tokens (e.g. @current) so agent loop still processes them
+    let sendText = text;
+    if (hiddenMentions.length > 0) {
+      sendText = `${hiddenMentions.join(" ")} ${text}`;
+      hiddenMentions = [];
+    }
+
     // Pass current selection and consume it (one-shot per send)
     const currentSelection = selection;
     selection = null;
-    onSend(text, currentSelection);
+    onSend(sendText, currentSelection);
   }
 
   function handleKeydown(e: KeyboardEvent): void {
@@ -265,6 +279,14 @@
     inputText = `${before}${suggestion.insert}${after}`;
     showNoteSuggestions = false;
     mentionRange = null;
+
+    // Store hidden mention tokens so the agent loop still gets @current context
+    if (suggestion.kind === "current") {
+      if (!hiddenMentions.includes("@current")) {
+        hiddenMentions = [...hiddenMentions, "@current"];
+      }
+    }
+
     textareaEl.focus();
   }
 
@@ -279,9 +301,14 @@
   }
 
   function updateNoteSuggestions(): void {
+    if (closeSuggestionsTimer) {
+      clearTimeout(closeSuggestionsTimer);
+      closeSuggestionsTimer = null;
+    }
     const cursorPos = textareaEl?.selectionStart ?? inputText.length;
     const textBefore = inputText.slice(0, cursorPos);
-    const match = textBefore.match(/@([\w\-\u4e00-\u9fa5:\/#\s.+_]*)$/);
+    // 匹配 @ 后面的内容，但不包含空格
+    const match = textBefore.match(/@([\w\-\u4e00-\u9fa5:\/#\.+_]*)$/);
     if (!match) {
       showNoteSuggestions = false;
       mentionRange = null;
@@ -335,7 +362,7 @@
         path: currentFile.path,
         title: "Current file",
         subtitle: currentFile.path,
-        insert: "@current",
+        insert: `[[${currentFile.name}]]`,
       });
     }
 
@@ -510,7 +537,18 @@
     <div class="ochat-input-top">
       <button 
         class="ochat-at-btn" 
+        onmousedown={(e) => {
+          e.preventDefault();
+          if (closeSuggestionsTimer) {
+            clearTimeout(closeSuggestionsTimer);
+            closeSuggestionsTimer = null;
+          }
+        }}
         onclick={() => {
+          if (closeSuggestionsTimer) {
+            clearTimeout(closeSuggestionsTimer);
+            closeSuggestionsTimer = null;
+          }
           textareaEl?.focus();
           
           // Wait a tick to make sure focus is applied
@@ -566,9 +604,9 @@
         }}
         onfocus={updateNoteSuggestions}
         onblur={() => {
-          setTimeout(() => {
+          closeSuggestionsTimer = setTimeout(() => {
             showNoteSuggestions = false;
-          }, 150);
+          }, 200);
         }}
       ></textarea>
       {#if showNoteSuggestions}
@@ -581,6 +619,10 @@
               tabindex="-1"
               onmousedown={(event) => {
                 event.preventDefault();
+                if (closeSuggestionsTimer) {
+                  clearTimeout(closeSuggestionsTimer);
+                  closeSuggestionsTimer = null;
+                }
                 selectNoteSuggestion(index);
               }}
             >
