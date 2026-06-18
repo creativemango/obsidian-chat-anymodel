@@ -44,6 +44,9 @@
   // Selection scope (shown as a pill above input)
   let selection = $state<SelectionScope | null>(null);
 
+  // Hidden mention tokens that should be sent to the agent but not displayed
+  let hiddenMentions = $state<string[]>([]);
+
   // @ mention autocomplete for files, folders, tags, and current file
   interface MentionSuggestion {
     kind: "file" | "folder" | "tag" | "current";
@@ -146,6 +149,7 @@
   export function clearMessages(): void {
     messages = [];
     selection = null;
+    hiddenMentions = [];
     hideThinking();
   }
 
@@ -211,10 +215,17 @@
       return;
     }
 
+    // Prepend hidden mention tokens (e.g. @current) so agent loop still processes them
+    let sendText = text;
+    if (hiddenMentions.length > 0) {
+      sendText = `${hiddenMentions.join(" ")} ${text}`;
+      hiddenMentions = [];
+    }
+
     // Pass current selection and consume it (one-shot per send)
     const currentSelection = selection;
     selection = null;
-    onSend(text, currentSelection);
+    onSend(sendText, currentSelection);
   }
 
   function handleKeydown(e: KeyboardEvent): void {
@@ -265,6 +276,14 @@
     inputText = `${before}${suggestion.insert}${after}`;
     showNoteSuggestions = false;
     mentionRange = null;
+
+    // Store hidden mention tokens so the agent loop still gets @current context
+    if (suggestion.kind === "current") {
+      if (!hiddenMentions.includes("@current")) {
+        hiddenMentions = [...hiddenMentions, "@current"];
+      }
+    }
+
     textareaEl.focus();
   }
 
@@ -335,7 +354,7 @@
         path: currentFile.path,
         title: "Current file",
         subtitle: currentFile.path,
-        insert: "@current",
+        insert: `[[${currentFile.name}]]`,
       });
     }
 
@@ -929,6 +948,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+
     margin-bottom: 8px;
   }
 
