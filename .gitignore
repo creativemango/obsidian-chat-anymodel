@@ -7,3 +7,6 @@ debug.log
 
 # Clawpatch local review state
 .clawpatch/
+
+# Runtime chat history
+chat-state.json
