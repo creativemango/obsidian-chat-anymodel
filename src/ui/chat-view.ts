@@ -199,6 +199,11 @@ export class ObsidianChatView extends ItemView {
           chat.setInputEnabled(false);
           return answer;
         },
+        onError: (error) => {
+          chat.hideThinking();
+          chat.addError(error);
+          history.push({ type: "error", text: error });
+        },
       }, selection, chat.getExternalContexts());
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

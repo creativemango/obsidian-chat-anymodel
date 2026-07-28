@@ -658,6 +658,15 @@
             onchange={handleFileInput}
           />
         {/if}
+        {#if !inputEnabled}
+          <button
+            class="ochat-stop-btn"
+            onclick={onStop}
+            aria-label="Stop responding"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+          </button>
+        {/if}
         <button
           class="ochat-send-btn"
           class:active={inputText.trim().length > 0}
@@ -1139,6 +1148,28 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
+
+  /* Stop button (shown when AI is responding) */
+  .ochat-stop-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+    border: none;
+    border-radius: var(--radius-m);
+    background-color: var(--background-modifier-error);
+    color: var(--text-on-accent);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .ochat-stop-btn:hover {
+    background-color: var(--background-modifier-error-hover, #c0392b);
+  }
+
 
   /* ─── Responsive ────────────────────────────────────────────────────── */
   @media (max-width: 768px) {
