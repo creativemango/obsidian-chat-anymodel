@@ -1,4 +1,4 @@
-import { App, TFile, TFolder } from "obsidian";
+﻿import { App, TFile, TFolder } from "obsidian";
 import type {
   ChatSettings,
   UnifiedMessage,
@@ -71,7 +71,7 @@ export class AgentLoop {
 
   /** Restore API messages from persistence */
   importMessages(messages: UnifiedMessage[]): void {
-    this.messages = messages;
+    this.messages = sanitizeMessages(messages);
   }
 
   /** Export the full conversation as a readable markdown transcript */
@@ -407,4 +407,25 @@ export class AgentLoop {
       this.messages = this.messages.slice(-KEEP_RECENT);
     }
   }
+}
+
+
+/**
+ * Sanitize messages loaded from persistence, stripping any content block
+ * types that may not be supported by all providers (e.g. image_url).
+ * This prevents serialization errors with providers like DeepSeek that
+ * only support "text" type content blocks.
+ */
+function sanitizeMessages(messages: UnifiedMessage[]): UnifiedMessage[] {
+  const allowedBlockTypes = new Set(["text", "tool_use", "tool_result"]);
+  return messages.map((msg) => {
+    if (typeof msg.content === "string") return msg;
+    // Filter content blocks to only allowed types
+    const filtered = msg.content.filter((b) => allowedBlockTypes.has(b.type));
+    // If all blocks were filtered out, keep a text placeholder
+    if (filtered.length === 0) {
+      return { role: msg.role, content: "[Content omitted: unsupported format]" };
+    }
+    return { ...msg, content: filtered };
+  });
 }

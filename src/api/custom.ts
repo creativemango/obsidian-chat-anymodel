@@ -22,13 +22,12 @@ export async function sendCustomMessage(
 ): Promise<UnifiedResponse> {
   const baseUrl = (settings.baseUrl || "http://localhost:11434").replace(/\/+$/, "");
   const model = settings.model || "deepseek-chat";
+  const supportsImages = supportsImageInput(model);
 
   const apiMessages: Record<string, unknown>[] = [];
 
-  // System prompt as the first message
-  if (systemPrompt) {
-    apiMessages.push({ role: "system", content: systemPrompt });
-  }
+  // System prompt (insert at front after building all messages)
+  const systemMessage = systemPrompt ? { role: "system" as const, content: systemPrompt } : null;
 
   // Convert unified messages to OpenAI Chat Completions format
   for (const msg of messages) {
@@ -39,31 +38,57 @@ export async function sendCustomMessage(
       const textParts: string[] = [];
       const toolCalls: Record<string, unknown>[] = [];
 
+      // Check if any image_url blocks exist (for diagnostics)
+      const hasImageBlock = msg.content.some(
+        (b) => ((b as unknown) as Record<string, unknown>).type === "image_url"
+      );
+
       for (const block of msg.content) {
-        if (block.type === "text" && block.text) {
-          textParts.push(block.text);
-        } else if (block.type === "tool_use") {
-          toolCalls.push({
-            id: block.id,
-            type: "function",
-            function: {
-              name: block.name,
-              arguments: JSON.stringify(block.input),
-            },
-          });
-        } else if (block.type === "tool_result") {
-          apiMessages.push({
-            role: "tool",
-            tool_call_id: block.tool_use_id,
-            content: block.content || "",
-          });
+        const b = (block as unknown) as Record<string, unknown>;
+        switch (b.type) {
+          case "text":
+            if (b.text) textParts.push(b.text as string);
+            break;
+          case "image_url": {
+            // If the model supports images, preserve the image_url;
+            // otherwise, convert to a text placeholder.
+            if (supportsImages) {
+              textParts.push(`[Image: ${(b.image_url as Record<string, unknown>)?.url || "attached image"}]`);
+            } else {
+              textParts.push("[Image (not supported by this model)]");
+            }
+            break;
+          }
+          case "tool_use":
+            toolCalls.push({
+              id: b.id,
+              type: "function",
+              function: {
+                name: b.name,
+                arguments: JSON.stringify(b.input),
+              },
+            });
+            break;
+          case "tool_result":
+            apiMessages.push({
+              role: "tool",
+              tool_call_id: b.tool_use_id,
+              content: (b.content as string) || "",
+            });
+            break;
+          default:
+            // Unknown block type - convert to text fallback to avoid
+            // breaking poorly-supported providers (e.g. DeepSeek, Ollama)
+            textParts.push(`[Unsupported content: ${b.type}]`);
+            break;
         }
       }
 
+      // Build the message
       if (msg.role === "assistant") {
         const entry: Record<string, unknown> = { role: "assistant" };
         if (textParts.length > 0) {
-          entry.content = textParts.join("");
+          entry.content = textParts.join("\n");
         } else {
           entry.content = null;
         }
@@ -71,10 +96,15 @@ export async function sendCustomMessage(
           entry.tool_calls = toolCalls;
         }
         apiMessages.push(entry);
-      } else if (textParts.length > 0) {
+      } else if (textParts.length > 0 || hasImageBlock) {
         apiMessages.push({ role: "user", content: textParts.join("") });
       }
     }
+  }
+
+  // Insert system prompt at the front
+  if (systemMessage) {
+    apiMessages.unshift(systemMessage);
   }
 
   const body: Record<string, unknown> = {
@@ -166,3 +196,15 @@ export async function sendCustomMessage(
       : undefined,
   };
 }
+
+/**
+ * Check if a model/API supports image_url content blocks.
+ * Most OpenAI-compatible providers (DeepSeek, Ollama, Together, etc.)
+ * do NOT support vision/image inputs. Only a few do.
+ *
+ * Override via model name: if it contains known vision-supporting keywords.
+ */
+function supportsImageInput(model: string): boolean {
+  return /vision|vl|multimodal|gpt-4o|gpt-4\.1|claude-3\.5|claude-3\.7/i.test(model);
+}
+
